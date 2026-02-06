@@ -20,8 +20,8 @@ services:
     image: dpage/pgadmin4
     container_name: cyber_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@cyber.local
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: admin@cyber.com
+      PGADMIN_DEFAULT_PASSWORD: adminqwerty
     ports:
       - "5050:80"
     depends_on:
