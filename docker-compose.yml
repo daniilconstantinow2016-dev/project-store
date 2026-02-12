@@ -1,11 +1,8 @@
-version: '3.8'
-
 services:
-  # Эмуляция Managed PostgreSQL
+  # 1. База Данных (с правильным Healthcheck)
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: cyber_postgres
-    restart: always
     environment:
       POSTGRES_USER: cyber_user
       POSTGRES_PASSWORD: cyber_password
@@ -14,18 +11,39 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Проверяем утилитой pg_isready (она встроена в образ)
+      test: ["CMD-SHELL", "pg_isready -U cyber_user -d cyber_market_db"]
+      interval: 10s       # Проверять раз в 10 секунд (реже, чем раньше)
+      timeout: 5s         # Ждать ответа 5 секунд
+      retries: 5          # Если 5 раз подряд ошибка — тогда помечаем как unhealthy
+      start_period: 30s   # 👈 ГЛАВНОЕ: Первые 30 сек не считаем ошибки (даем проснуться)
 
-  # ИНТ для БД
+  # 2. Админка
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:latest
     container_name: cyber_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@cyber.com
-      PGADMIN_DEFAULT_PASSWORD: adminqwerty
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
     ports:
       - "5050:80"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy # Ждем, пока база скажет "Я здорова"
+
+  # 3. Твое приложение
+  app:
+    container_name: cyber_app
+    build: ./backend/services/catalog
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://cyber_user:cyber_password@postgres:5432/cyber_market_db
+      HTTP_PORT: :8080
+    depends_on:
+      postgres:
+        condition: service_healthy # Ждем, пока база скажет "Я здорова"
 
 volumes:
   postgres_data:
