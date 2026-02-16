@@ -15,12 +15,13 @@ RUN go build -mod=vendor -o main cmd/app/main.go
 
 
 # --- Вторая часть без изменений ---
-FROM alpine:latest
+FROM alpine:3.20
 
 WORKDIR /root/
 
 RUN apk --no-cache add ca-certificates
 
+# ... (остальное без изменений) ...
 COPY --from=builder /app/main .
 COPY .env .
 
