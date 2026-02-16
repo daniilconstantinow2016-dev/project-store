@@ -32,18 +32,23 @@ services:
       postgres:
         condition: service_healthy # Ждем, пока база скажет "Я здорова"
 
-  # 3. Твое приложение
+# 3. Твое приложение
   app:
     container_name: cyber_app
     build: ./backend/services/catalog
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://cyber_user:cyber_password@postgres:5432/cyber_market_db
-      HTTP_PORT: :8080
+      # 👇 ВАЖНО: Имена переменных должны совпадать с тегами `env` в Go структурах!
+      - CONFIG_PATH=./config/local.yaml
+      - DB_HOST=postgres          # Это имя сервиса БД (строка 2 в этом файле)
+      - DB_PORT=5432
+      - DB_USER=cyber_user
+      - DB_PASSWORD=cyber_password
+      - DB_NAME=cyber_market_db
     depends_on:
       postgres:
-        condition: service_healthy # Ждем, пока база скажет "Я здорова"
+        condition: service_healthy
 
 volumes:
   postgres_data:

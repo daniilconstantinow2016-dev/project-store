@@ -1,0 +1,13 @@
+env: "local"
+
+http_server:
+  address: ":8080"
+  timeout: 4s
+  idle_timeout: 60s
+
+database:
+  host: "localhost"
+  port: "5432"
+  user: "cyber_user"
+  password: "cyber_password"
+  name: "cyber_market_db"

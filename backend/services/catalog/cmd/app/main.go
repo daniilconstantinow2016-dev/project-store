@@ -6,35 +6,41 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
+	// 👇 ТВОИ ИМПОРТЫ
+	"github.com/daniil-dev/project-store/backend/services/catalog/internal/config" // Наш новый конфиг
 	"github.com/daniil-dev/project-store/backend/services/catalog/internal/repository"
 	"github.com/daniil-dev/project-store/backend/services/catalog/internal/transport/rest"
 
-	_ "github.com/lib/pq"         // Стандартный драйвер (он у нас был изначально)
-	"github.com/pressly/goose/v3" // Мигратор
+	_ "github.com/lib/pq"
+	"github.com/pressly/goose/v3"
 )
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
 
 func main() {
-	// 1. Конфиг
-	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = "postgres"
-	}
+	// 1. ⚙️ ЗАГРУЗКА КОНФИГУРАЦИИ
+	cfg := config.MustLoad()
 
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable",
-		"cyber_user", "cyber_password", dbHost, "cyber_market_db")
+	fmt.Printf("Запуск конфига: %s\n", cfg.Env)
 
-	// 2. Подключение (ОДНО, стандартное)
+	// Формируем строку подключения, используя данные из конфига
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.Name,
+	)
+
+	// 2. Подключение к БД
 	var db *sql.DB
 	var err error
 
 	for i := 0; i < 10; i++ {
-		db, err = sql.Open("postgres", connStr) // Используем стандартный sql.Open
+		db, err = sql.Open("postgres", connStr)
 		if err == nil {
 			err = db.Ping()
 		}
@@ -51,34 +57,36 @@ func main() {
 	}
 	defer db.Close()
 
-	// 3. 🦆 МИГРАЦИИ (Исправленный блок)
-	// Вместо WithFS используем SetBaseFS - это работает во всех версиях
+	// 3. 🦆 Миграции
 	goose.SetBaseFS(embedMigrations)
-
 	if err := goose.SetDialect("postgres"); err != nil {
 		log.Fatal(err)
 	}
-
 	if err := goose.Up(db, "migrations"); err != nil {
 		log.Fatal("Ошибка миграции:", err)
 	}
 	fmt.Println("Миграции успешно применены! 🦆")
 
-	// 4. Инициализация
-	// Теперь db имеет тип *sql.DB, и твой репозиторий его примет без ошибок
+	// 4. Инициализация слоев
 	repo := repository.NewProductRepository(db)
 	handler := rest.NewHandler(repo)
 
 	// 5. Роутинг
-	http.HandleFunc("/products", handler.CreateProduct)
-	http.HandleFunc("/products/list", handler.GetAllProducts)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/products", handler.CreateProduct)
+	mux.HandleFunc("/products/list", handler.GetAllProducts)
 
-	// 6. Запуск
-	port := os.Getenv("HTTP_PORT")
-	if port == "" {
-		port = ":8080"
+	// 6. Запуск сервера (с таймаутами из конфига)
+	srv := &http.Server{
+		Addr:         cfg.HTTPServer.Address,
+		Handler:      mux,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
 	}
 
-	fmt.Println("Сервер запущен на порту", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	fmt.Println("Сервер запущен на порту", cfg.HTTPServer.Address)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatal("Ошибка сервера:", err)
+	}
 }

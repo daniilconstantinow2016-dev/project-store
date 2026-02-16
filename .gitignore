@@ -4,24 +4,36 @@
 *.tfstate.backup
 *.tfvars
 .terraform.lock.hcl
-# Crash logs
 crash.log
 override.tf
 override.tf.json
 
-# --- GO ---
+# --- GO Backend ---
+# Мы используем vendor для Докера, поэтому НЕ игнорируем саму папку vendor
+# Но игнорируем скомпилированные бинарники
 /backend/**/bin/
-/backend/**/vendor/
-go.sum
+# go.sum НУЖЕН в репозитории, убрали его из игнора
 
-# --- IDE OS ---
-.idea/
+# --- Frontend (React/Node) ---
+# Самое важное: никогда не пушим node_modules
+node_modules/
+frontend/node_modules/
+# Папка сборки (результат билда)
+dist/
+frontend/dist/
+build/
+# Логи ошибок npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Локальные настройки редакторов
 .vscode/
+.idea/
 .DS_Store
 Thumbs.db
 
-# --- Secrets ---
+# --- Secrets (НИКОГДА НЕ ПУШИТЬ) ---
 *.env
+.env.local
 key.json
 authorized_key.json
-
